@@ -1,0 +1,32 @@
+# Libraries
+/node_modules
+
+# IDE Files
+.vscode/*
+.idea/*
+.claude/
+
+# Typescript
+/dist
+/build
+tsconfig.tsbuildinfo
+
+# Temporary test files
+test.ts
+src/test.ts
+playground.ts
+src/playground.ts
+scratch.ts
+src/scratch.ts
+
+# Environment
+.env
+
+# Database
+/dossier.sqlite
+/dossier.sqlite-shm
+/dossier.sqlite-wal
+
+# Attachment store -- user message content, never committable by accident
+/Attachments
+/.attachments-test
