@@ -19,7 +19,7 @@
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.4.2",
-    "simplyjs": "^1.4.0-alpha",
+    "simplyjs": "^1.5.0-alpha",
     "source-map-support": "^0.5.21"
   },
   "devDependencies": {

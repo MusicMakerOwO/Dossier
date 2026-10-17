@@ -201,13 +201,13 @@ describe("SyncChannelWebhooks", () => {
 		expect(await SyncChannelWebhooks(guild, CHANNEL)).toEqual({ changes: [] });
 	});
 
-	it("should not call a webhook deleted when checking on it fails for another reason", async () => {
+	it("should not call a webhook deleted when checking on it fails for another reason, and re-list the guild next time", async () => {
 		const guild = await Warmed([Hook("1")]);
 
 		Get.mockImplementationOnce(async () => []).mockImplementationOnce(async () => { throw Forbidden(); });
-		const result = await SyncChannelWebhooks(guild, CHANNEL);
+		expect(await SyncChannelWebhooks(guild, CHANNEL)).toEqual({ changes: [] });
 
-		expect(result).toEqual({ changes: [] });
+		expect(await SyncChannelWebhooks(guild, CHANNEL)).toEqual({ blind: "unsynced" });
 		expect(guild.webhooks.has("1")).toBe(true);
 	});
 });

@@ -3,7 +3,6 @@ import { Log } from "../Log.js";
 import { DiffWebhook, SnapshotWebhook, WebhookBlindReason, WebhookSnapshot } from "./ServerLogs.js";
 
 // WEBHOOKS_UPDATE only names a channel, so changes are found by re-listing it and diffing against the cache.
-// The sync also evicts deleted webhooks, which the library's cache never does (simplyjs-findings.md #17)
 
 export type WebhookChange =
 	| { kind: "create"; after: WebhookSnapshot }
@@ -46,11 +45,7 @@ export function WarmWebhooks(guild: Guild): Promise<boolean> {
 
 async function Warm(guild: Guild): Promise<boolean> {
 	try {
-		const listed = new Set((await guild.webhooks.fetchAll()).map((webhook) => webhook.id));
-		for (const id of [...guild.webhooks.keys()]) {
-			if (!listed.has(id)) guild.webhooks.delete(id);
-		}
-
+		await guild.webhooks.fetchAll();
 		warmed.add(guild.id);
 		return true;
 	} catch (error) {
@@ -114,11 +109,12 @@ async function Sync(guild: Guild, channelId: string): Promise<WebhookSyncResult>
 			if (DiffWebhook(old, after).length > 0) changes.push({ kind: "update", before: old, after });
 		} catch (error) {
 			if (!IsGone(error)) {
+				// fetchChannel already evicted it, so only a full re-list can bring it back
+				warmed.delete(guild.id);
 				Log('WARN', `Could not check on webhook ${old.id} in guild ${guild.id}:`, error);
 				continue;
 			}
 
-			guild.webhooks.delete(old.id);
 			changes.push({ kind: "delete", before: old });
 		}
 	}
