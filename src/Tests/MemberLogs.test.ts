@@ -73,6 +73,12 @@ describe("SnapshotMember", () => {
 		expect(snapshot.roles).toEqual(["1"]);
 	});
 
+	it("should show the server avatar over the account's", () => {
+		const member = guild.members.upsert({ user, avatar: "abc", roles: [], joined_at: EARLIER, deaf: false, mute: false, flags: 0 } as DiscordMember);
+
+		expect(SimplifyMember(member).avatarURL).toContain(`guilds/${GUILD}/users/700/avatars/abc`);
+	});
+
 	it("should mark an uncached member by its missing roles", () => {
 		const snapshot = SimplifyMember({ id: "700", guildId: GUILD, user: client.users.upsert(user) });
 

@@ -21,8 +21,8 @@ export type SimpleMember = {
 	globalName: string | null;
 	bot: boolean;
 	/**
-	 * The account's avatar URL, read at snapshot time because the library patches the shared user in
-	 * place. The server avatar has no URL to read (simplyjs-findings.md #15).
+	 * The avatar shown in this guild: the server avatar, else the account's. Read at snapshot time
+	 * because the library patches the shared user in place.
 	 */
 	avatarURL: string;
 	nick: string | null;
@@ -41,7 +41,7 @@ export function SimplifyMember(source: Member | UncachedMember): SimpleMember {
 		username: source.user.username,
 		globalName: source.user.globalName,
 		bot: source.user.bot === true,
-		avatarURL: source.user.avatarURL()
+		avatarURL: source instanceof Member ? source.avatarURL() : source.user.avatarURL()
 	};
 
 	if (!(source instanceof Member)) {
