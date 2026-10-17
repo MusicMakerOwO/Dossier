@@ -16,7 +16,7 @@ report, not a bug to route around (see `voice` in plan section 3).
 
 ## SimplyJS is not discord.js
 
-`simplyjs` (currently `1.4.0-alpha`) is a from-scratch library by the same author. It shares no
+`simplyjs` (currently `1.5.0-alpha`) is a from-scratch library by the same author. It shares no
 class names, signatures, or conventions with discord.js — do not suggest discord.js patterns.
 
 - It is consumed as a published npm package: bundled `dist/` plus declarations, no source tree.
@@ -106,9 +106,10 @@ which fires `GuildBanAdd` (claims, `mod`) and `MemberDelete` (observes, `members
 
 **A webhook change is a diff Dossier makes itself.** `WEBHOOKS_UPDATE` names a channel and nothing
 else, so `Logs/WebhookSync.ts` snapshots `guild.webhooks`, re-lists the channel, and reports what is
-different. The library's cache only ever grows (`simplyjs-findings.md`, finding 17), so the sync is
-also what evicts deleted webhooks. Skip it and the same delete is reported on every later event.
-Syncs are queued per guild, because a move touches two channels. A guild that was never listed, or
+different. The snapshot must be taken by value first, because the library patches cached webhooks
+in place. `fetchChannel` evicts every webhook of that channel the listing left out, moved ones
+included, so a missing webhook is checked with `fetch(id)`; if that check fails for any reason other
+than a 404, the guild is unwarmed, since only a full re-list can restore the entry. Syncs are queued per guild, because a move touches two channels. A guild that was never listed, or
 that has not granted `MANAGE_WEBHOOKS`, gets the bare "something changed here" log instead of a
 guess. A webhook snapshot never reads `token` or `url`.
 
@@ -139,7 +140,7 @@ error), no `BEGIN`/`COMMIT` inside a file (the runner wraps each), never edit a 
   alternatives. Inside a function body, a comment is the exception: one plain sentence, and only
   where reordering or simplifying the code under it would cause a bug. Prefer a named local or a
   small helper over a comment. A workaround for a logged library finding gets one line naming it,
-  e.g. `(simplyjs-findings.md #17)`. Tests carry almost no comments; the test name states the
+  e.g. `(simplyjs-findings.md #N)`. Tests carry almost no comments; the test name states the
   intent. Never use `--` as punctuation.
 
 ## Environment

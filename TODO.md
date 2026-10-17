@@ -60,3 +60,4 @@ under `# BACKLOG` is deliberately post-MVP (plan section 5) and stays there.
 - [x] messages: bulk deletes as one log with per-author counts and a full transcript file, attributed by the channel's audit entry. Attachments are named, not re-uploaded #messages
 - [x] Privileged intent pre-flight: startup reads the application's flags and refuses to log in, naming the intent, when `GuildMembers` or `MessageContent` is off #wizard
 - [x] `/config` warns when the bot lacks `VIEW_AUDIT_LOG` (panel-wide) or `MANAGE_WEBHOOKS` (on the server group) #wizard #server
+- [x] SimplyJS `1.5.0-alpha`: findings 13 to 17 verified fixed and their workarounds removed. Role logs show the custom icon, server updates show each new image, member logs show the server avatar #simplyjs
