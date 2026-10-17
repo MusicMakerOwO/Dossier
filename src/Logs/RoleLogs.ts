@@ -3,8 +3,10 @@ import {
 	DiscordAuditLogEntry,
 	DiscordPermissions,
 	Role,
+	SectionBuilder,
 	SeparatorBuilder,
 	TextDisplayBuilder,
+	ThumbnailBuilder,
 	UncachedRole
 } from "simplyjs";
 
@@ -21,8 +23,8 @@ export type RoleSnapshot = {
 	hoist: boolean | null;
 	mentionable: boolean | null;
 	managed: boolean | null;
-	/** The custom icon's hash. Compared, never shown (simplyjs-findings.md #13). */
-	icon: string | null;
+	/** The custom icon's URL, `null` when it has none or shows a standard emoji instead. */
+	iconURL: string | null;
 	unicodeEmoji: string | null;
 	permissions: bigint | null;
 	/** The bot an integration role belongs to. */
@@ -41,7 +43,7 @@ export function SnapshotRole(source: Role | UncachedRole): RoleSnapshot {
 			hoist: null,
 			mentionable: null,
 			managed: null,
-			icon: null,
+			iconURL: null,
 			unicodeEmoji: null,
 			permissions: null,
 			botId: null,
@@ -61,7 +63,7 @@ export function SnapshotRole(source: Role | UncachedRole): RoleSnapshot {
 		hoist: source.hoist,
 		mentionable: source.mentionable,
 		managed: source.managed,
-		icon: source.icon ?? null,
+		iconURL: source.iconURL(),
 		unicodeEmoji: source.unicodeEmoji ?? null,
 		permissions: source.permissions.value,
 		botId: source.tags.botId ?? null,
@@ -91,9 +93,9 @@ export function DiffRole(before: RoleSnapshot, after: RoleSnapshot): string[] {
 		lines.push(`**Anyone can @mention it** ${after.mentionable ? "turned on" : "turned off"}`);
 	}
 
-	if (before.icon !== after.icon || before.unicodeEmoji !== after.unicodeEmoji) {
+	if (before.iconURL !== after.iconURL || before.unicodeEmoji !== after.unicodeEmoji) {
 		// Both are custom images, which differ only by hash
-		const replaced = before.icon !== null && after.icon !== null;
+		const replaced = before.iconURL !== null && after.iconURL !== null;
 		lines.push(replaced ? "**Icon** custom image replaced" : `**Icon** ${Icon(before)} → ${Icon(after)}`);
 	}
 
@@ -114,7 +116,7 @@ export function BuildRoleCreateLog(role: RoleSnapshot, entry: DiscordAuditLogEnt
 	const container = new ContainerBuilder()
 		.setAccentColor(COLOR.LOG_CREATE)
 		.addComponents(
-			new TextDisplayBuilder().setContent(`### ➕ Role created\n${Subject(role)}\n${actor}`),
+			Header(role, `### ➕ Role created\n${Subject(role)}\n${actor}`),
 			new SeparatorBuilder().setDivider(),
 			new TextDisplayBuilder().setContent(Truncate(`**Permissions** ${PermissionList(role.permissions)}`, PermissionsLimit)),
 			Footer(role)
@@ -127,7 +129,7 @@ export function BuildRoleCreateLog(role: RoleSnapshot, entry: DiscordAuditLogEnt
 export function BuildRoleUpdateLog(before: RoleSnapshot | undefined, after: RoleSnapshot, fields: string[], entry: DiscordAuditLogEntry | null): LogMessage {
 	const container = new ContainerBuilder()
 		.setAccentColor(COLOR.LOG_UPDATE)
-		.addComponents(new TextDisplayBuilder().setContent(`### ✏️ Role changed\n${Subject(after)}\n${ActorLine(entry)}`));
+		.addComponents(Header(after, `### ✏️ Role changed\n${Subject(after)}\n${ActorLine(entry)}`));
 
 	if (!before) {
 		container.addComponents(
@@ -154,7 +156,7 @@ export function BuildRoleDeleteLog(role: RoleSnapshot, entry: DiscordAuditLogEnt
 	const container = new ContainerBuilder()
 		.setAccentColor(COLOR.LOG_DELETE)
 		.addComponents(
-			new TextDisplayBuilder().setContent(`### 🗑️ Role deleted\n**Role** ${name}\n${ActorLine(entry)}`),
+			Header(role, `### 🗑️ Role deleted\n**Role** ${name}\n${ActorLine(entry)}`),
 			Footer(role)
 		);
 
@@ -190,6 +192,16 @@ export function BuildRoleReorderLog(guildId: string, moves: Move[], shifted: num
 /** Returns the role as a mention, or as "@everyone" for the everyone role. */
 function RoleRef(id: string, guildId: string): string {
 	return id === guildId ? "@everyone" : `<@&${id}>`;
+}
+
+/** Returns the header text, beside the role's custom icon when it has one. */
+function Header(role: RoleSnapshot, content: string): TextDisplayBuilder | SectionBuilder {
+	const text = new TextDisplayBuilder().setContent(content);
+	if (!role.iconURL) return text;
+
+	const thumbnail = new ThumbnailBuilder().setMedia(role.iconURL);
+	if (role.name) thumbnail.setDescription(role.name);
+	return new SectionBuilder().addComponents(text).setAccessory(thumbnail);
 }
 
 function Subject(role: RoleSnapshot): string {
@@ -251,5 +263,5 @@ function Hex(color: number): string {
 
 function Icon(role: RoleSnapshot): string {
 	if (role.unicodeEmoji) return role.unicodeEmoji;
-	return role.icon ? "custom image" : "*none*";
+	return role.iconURL ? "custom image" : "*none*";
 }

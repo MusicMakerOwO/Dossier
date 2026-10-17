@@ -19,7 +19,7 @@ const GUILD = "100";
 function Role(fields: Partial<RoleSnapshot> = {}): RoleSnapshot {
 	return {
 		id: "10", guildId: GUILD, name: "mods", colors: { primary: 0, secondary: null, tertiary: null },
-		hoist: false, mentionable: false, managed: false, icon: null, unicodeEmoji: null, permissions: 0n, botId: null, position: 1, ...fields
+		hoist: false, mentionable: false, managed: false, iconURL: null, unicodeEmoji: null, permissions: 0n, botId: null, position: 1, ...fields
 	};
 }
 
@@ -27,9 +27,23 @@ function Entry(userId = "900"): DiscordAuditLogEntry {
 	return { id: "1", action_type: AuditLogEvents.RoleUpdate, target_id: "10", user_id: userId };
 }
 
+/** Every line of text in the container, including text that sits beside a thumbnail. */
 function Text(container: ContainerBuilder): string {
-	return container.components.flatMap((child) => "content" in child ? [child.content] : []).join("\n");
+	return container.components.flatMap((child) => {
+		if ("content" in child) return [child.content];
+		if ("accessory" in child) return child.components.map((text) => text.content);
+		return [];
+	}).join("\n");
 }
+
+function Thumbnail(container: ContainerBuilder): string | undefined {
+	for (const child of container.components) {
+		if ("accessory" in child && "media" in child.accessory) return child.accessory.media.url;
+	}
+	return undefined;
+}
+
+const ICON = "https://cdn.discordapp.com/role-icons/10/abc.png";
 
 /** Runs the library's send-path validation on the log. */
 function Sendable(log: LogMessage): number | undefined {
@@ -54,7 +68,16 @@ describe("SnapshotRole", () => {
 	});
 
 	it("should read an uncached role's bare ids with everything else unknown", () => {
-		expect(SnapshotRole({ id: "11", guildId: GUILD })).toMatchObject({ id: "11", name: null, permissions: null, colors: null });
+		expect(SnapshotRole({ id: "11", guildId: GUILD })).toMatchObject({ id: "11", name: null, permissions: null, colors: null, iconURL: null });
+	});
+
+	it("should read a custom icon as its CDN URL", () => {
+		const role = guild.roles.upsert({
+			id: "10", name: "mods", color: 0, colors: { primary_color: 0, secondary_color: null, tertiary_color: null },
+			hoist: false, position: 1, permissions: "0", managed: false, mentionable: false, icon: "abc", flags: 0
+		});
+
+		expect(SnapshotRole(role).iconURL).toBe(`${ICON}?size=1024`);
 	});
 });
 
@@ -91,7 +114,7 @@ describe("DiffRole", () => {
 
 	it("should report an icon change without pretending two images are the same", () => {
 		expect(DiffRole(Role(), Role({ unicodeEmoji: "🛡️" }))).toEqual(["**Icon** *none* → 🛡️"]);
-		expect(DiffRole(Role({ icon: "a" }), Role({ icon: "b" }))).toEqual(["**Icon** custom image replaced"]);
+		expect(DiffRole(Role({ iconURL: ICON }), Role({ iconURL: ICON.replace("abc", "def") }))).toEqual(["**Icon** custom image replaced"]);
 	});
 });
 
@@ -128,6 +151,15 @@ describe("builders", () => {
 		expect(log.container.accent_color).toBe(COLOR.LOG_DELETE);
 		expect(Text(log.container)).toContain("**Role** `gone`");
 		expect(Text(log.container)).not.toContain("<@&10>");
+	});
+
+	it("should show a custom icon beside the header, and nothing without one", () => {
+		const log = BuildRoleUpdateLog(Role(), Role({ iconURL: ICON }), DiffRole(Role(), Role({ iconURL: ICON })), Entry());
+
+		expect(Thumbnail(log.container)).toBe(ICON);
+		expect(Text(log.container)).toContain("**Role** <@&10> `mods`");
+		expect(Sendable(log)).toBeTruthy();
+		expect(Thumbnail(BuildRoleCreateLog(Role(), Entry()).container)).toBeUndefined();
 	});
 
 	it("should stay sendable when a role gains every permission at once", () => {
