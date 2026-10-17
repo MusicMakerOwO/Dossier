@@ -4,7 +4,7 @@ import { ClientEventMap } from "simplyjs";
 export const GroupEvents = {
 	messages: ["MessageUpdate", "MessageDelete", "MessageDeleteBulk"],
 
-	// No UserUpdate: Discord only sends it for the bot's own account (simplyjs-findings.md #14)
+	// No ClientUserUpdate: it is only for the bot's own account
 	members: ["MemberCreate", "MemberUpdate", "MemberDelete"],
 
 	mod: ["GuildBanAdd", "GuildBanRemove", "AuditLogEntryCreate", "AutoModerationActionExecution"],
