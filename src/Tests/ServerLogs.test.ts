@@ -33,7 +33,7 @@ const GUILD = "100";
 
 function Server(fields: Partial<GuildSnapshot> = {}): GuildSnapshot {
 	return {
-		id: GUILD, name: "den", description: null, icon: null, banner: null, splash: null, discoverySplash: null,
+		id: GUILD, name: "den", description: null, iconURL: null, bannerURL: null, splashURL: null, discoverySplashURL: null,
 		vanityUrlCode: null, preferredLocale: "en-US", ownerId: "1", verificationLevel: 0, explicitContentFilter: 0,
 		mfaLevel: 0, defaultMessageNotifications: 0, invitesDisabledUntil: null, dmsDisabledUntil: null,
 		raidDetectedAt: null, dmSpamDetectedAt: null, systemChannelId: null, systemChannelFlags: 0, rulesChannelId: null,
@@ -63,6 +63,14 @@ function HasThumbnail(container: ContainerBuilder): boolean {
 	return container.components.some((child) => "accessory" in child);
 }
 
+function Gallery(container: ContainerBuilder): unknown[] {
+	return container.components.flatMap((child) => "items" in child ? child.items : []);
+}
+
+function Cdn(hash: string): string {
+	return `https://cdn.discordapp.com/icons/${GUILD}/${hash}.png`;
+}
+
 /** Runs the library's send-path validation on the log. */
 function Sendable(log: LogMessage): number | undefined {
 	return ResolveComponentsV2Flags({ components: [log.container], attachments: log.attachments });
@@ -75,7 +83,7 @@ describe("SnapshotGuild", () => {
 		const guild = client.guilds.upsert({ id: "101", name: "g", owner_id: "1", roles: [], emojis: [], features: [] } as unknown as DiscordGuildCreate);
 
 		expect(SnapshotGuild(guild)).toMatchObject({
-			id: "101", name: "g", ownerId: "1", icon: null, description: null, systemChannelId: null,
+			id: "101", name: "g", ownerId: "1", iconURL: null, description: null, systemChannelId: null,
 			invitesDisabledUntil: null, widgetEnabled: false, systemChannelFlags: 0
 		});
 	});
@@ -87,6 +95,14 @@ describe("SnapshotGuild", () => {
 		guild.features.push("DISCOVERABLE");
 
 		expect(snapshot.features).toEqual(["COMMUNITY"]);
+	});
+
+	it("should read images as CDN URLs", () => {
+		const guild = client.guilds.upsert({ id: "104", name: "g", icon: "a_abc", banner: "def", roles: [], emojis: [], features: [] } as unknown as DiscordGuildCreate);
+
+		expect(SnapshotGuild(guild)).toMatchObject({
+			iconURL: expect.stringContaining("icons/104/a_abc.gif"), bannerURL: expect.stringContaining("banners/104/def.png"), splashURL: null
+		});
 	});
 
 	it("should flatten the incident data", () => {
@@ -127,8 +143,8 @@ describe("DiffGuild", () => {
 		expect(DiffGuild(Server(), Server({ verificationLevel: 9 }))).toEqual(["**Verification level** None → level 9"]);
 	});
 
-	it("should report images by which way they changed, never by hash", () => {
-		const lines = DiffGuild(Server({ banner: "aaa", splash: "bbb" }), Server({ icon: "ccc", banner: "ddd" }));
+	it("should report images by which way they changed, never by URL", () => {
+		const lines = DiffGuild(Server({ bannerURL: Cdn("aaa"), splashURL: Cdn("bbb") }), Server({ iconURL: Cdn("ccc"), bannerURL: Cdn("ddd") }));
 
 		expect(lines).toEqual(["**Icon** set", "**Banner** replaced", "**Invite background** removed"]);
 	});
@@ -211,6 +227,22 @@ describe("BuildGuildUpdateLog", () => {
 		const log = BuildGuildUpdateLog(Server(), Server({ premiumTier: 1 }), ["**Boost level** 0 → 1"], Entry(AuditLogEvents.GuildUpdate));
 
 		expect(Text(log.container)).toContain("**By** <@900>");
+	});
+
+	it("should show each image that was set or replaced, and none that was removed", () => {
+		const before = Server({ bannerURL: Cdn("aaa"), splashURL: Cdn("bbb") });
+		const after = Server({ iconURL: Cdn("ccc"), bannerURL: Cdn("ddd") });
+		const log = BuildGuildUpdateLog(before, after, DiffGuild(before, after), Entry(AuditLogEvents.GuildUpdate));
+
+		expect(Gallery(log.container)).toEqual([
+			{ media: { url: Cdn("ccc") }, description: "New icon" },
+			{ media: { url: Cdn("ddd") }, description: "New banner" }
+		]);
+		expect(Sendable(log)).toBeDefined();
+	});
+
+	it("should show no images when nothing to compare against", () => {
+		expect(Gallery(BuildGuildUpdateLog(undefined, Server({ iconURL: Cdn("ccc") }), [], null).container)).toEqual([]);
 	});
 
 	it("should stay inside the v2 content limit when everything changed at once", () => {

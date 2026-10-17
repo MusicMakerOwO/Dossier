@@ -9,6 +9,8 @@ import {
 	DiscordVerificationLevels,
 	DiscordWebhookType,
 	Guild,
+	MediaGalleryBuilder,
+	MediaGalleryItem,
 	SectionBuilder,
 	SeparatorBuilder,
 	TextDisplayBuilder,
@@ -28,11 +30,11 @@ export type GuildSnapshot = {
 	id: string;
 	name: string;
 	description: string | null;
-	/** Image hashes. Compared, never shown (simplyjs-findings.md #13). */
-	icon: string | null;
-	banner: string | null;
-	splash: string | null;
-	discoverySplash: string | null;
+	/** Image URLs, `null` when unset. A new image always gets a new URL, so these are compared directly. */
+	iconURL: string | null;
+	bannerURL: string | null;
+	splashURL: string | null;
+	discoverySplashURL: string | null;
 	vanityUrlCode: string | null;
 	preferredLocale: string;
 	ownerId: string;
@@ -63,10 +65,10 @@ export function SnapshotGuild(source: Guild): GuildSnapshot {
 		id: source.id,
 		name: source.name,
 		description: source.description ?? null,
-		icon: source.icon ?? null,
-		banner: source.banner ?? null,
-		splash: source.splash ?? null,
-		discoverySplash: source.discoverySplash ?? null,
+		iconURL: source.iconURL(),
+		bannerURL: source.bannerURL(),
+		splashURL: source.splashURL(),
+		discoverySplashURL: source.discoverySplashURL(),
 		vanityUrlCode: source.vanityUrlCode ?? null,
 		preferredLocale: source.preferredLocale,
 		ownerId: source.ownerId,
@@ -192,6 +194,9 @@ export function BuildGuildUpdateLog(before: GuildSnapshot | undefined, after: Gu
 		);
 	}
 
+	const images = before ? NewImages(before, after) : [];
+	if (images.length > 0) container.addComponents(new MediaGalleryBuilder().setItems(images));
+
 	container.addComponents(new TextDisplayBuilder().setContent(`-# Server ${after.id}`));
 	return { container, attachments: [] };
 }
@@ -212,10 +217,10 @@ function GuildActor(before: GuildSnapshot | undefined, after: GuildSnapshot, ent
 }
 
 const ImageFields = [
-	["Icon", "icon"],
-	["Banner", "banner"],
-	["Invite background", "splash"],
-	["Discovery background", "discoverySplash"]
+	["Icon", "iconURL"],
+	["Banner", "bannerURL"],
+	["Invite background", "splashURL"],
+	["Discovery background", "discoverySplashURL"]
 ] as const satisfies readonly (readonly [string, keyof GuildSnapshot])[];
 
 const ChannelFields = [
@@ -227,7 +232,15 @@ const ChannelFields = [
 	["Widget invite channel", "widgetChannelId"]
 ] as const satisfies readonly (readonly [string, keyof GuildSnapshot])[];
 
-/** Describes an image change as set, removed or replaced. Images differ only by hash. */
+/** Returns a gallery item for each image that was set or replaced, captioned with which one it is. */
+function NewImages(before: GuildSnapshot, after: GuildSnapshot): MediaGalleryItem[] {
+	return ImageFields.flatMap(([label, key]) => {
+		const url = after[key];
+		return url !== null && url !== before[key] ? [{ media: { url }, description: `New ${label.toLowerCase()}` }] : [];
+	});
+}
+
+/** Describes an image change as set, removed or replaced. */
 function ImageChange(before: string | null, after: string | null): string {
 	if (before === null) return "set";
 	return after === null ? "removed" : "replaced";
